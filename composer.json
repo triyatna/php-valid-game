@@ -1,0 +1,30 @@
+{
+  "name": "triyatna/php-valid-game",
+  "description": "Validate user id from games with php (scraper codeshop)",
+  "type": "library",
+  "license": "MIT",
+  "require": {
+    "php": "^8.2",
+    "ext-json": "*",
+    "guzzlehttp/guzzle": "^7.9|^8.0",
+    "psr/log": "^3.0",
+    "ramsey/uuid": "^4.7"
+  },
+  "autoload": {
+    "psr-4": {
+      "Triyatna\\ValidGame\\": "src/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Triyatna\\ValidGame\\Laravel\\ValidGameServiceProvider"
+      ],
+      "aliases": {
+        "ValidGame": "Triyatna\\ValidGame\\Laravel\\Facades\\ValidGame"
+      }
+    }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}

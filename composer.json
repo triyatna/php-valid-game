@@ -1,6 +1,6 @@
 {
   "name": "triyatna/php-valid-game",
-  "description": "Validate user id from games with php (scraper codeshop)",
+  "description": "Validate user id from games with php (scraper php)",
   "type": "library",
   "license": "MIT",
   "require": {

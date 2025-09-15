@@ -6,13 +6,11 @@ namespace Triyatna\PhpValidGame;
 
 use Psr\Log\LoggerInterface;
 use Triyatna\PhpValidGame\Contracts\PayloadResolverInterface;
-use Triyatna\PhpValidGame\Contracts\PageResolverInterface;
 use Triyatna\PhpValidGame\DTO\GameResult;
 use Triyatna\PhpValidGame\Exceptions\HttpRequestException;
 use Triyatna\PhpValidGame\Exceptions\InvalidInputException;
 use Triyatna\PhpValidGame\Registry\GameRegistry;
 use Triyatna\PhpValidGame\Resolvers\StaticPayloadResolver;
-use Triyatna\PhpValidGame\Resolvers\DynamicPageResolver;
 use Triyatna\PhpValidGame\Support\Str;
 use Triyatna\PhpValidGame\Transport\HttpClient;
 
@@ -20,7 +18,6 @@ final class ValidGameClient
 {
     private PayloadResolverInterface $resolver;
     private HttpClient $http;
-    private PageResolverInterface $pageResolver;
 
     public function __construct(
         ?PayloadResolverInterface $resolver = null,
@@ -32,7 +29,6 @@ final class ValidGameClient
         GameRegistry::init();
         $this->resolver = $resolver ?? new StaticPayloadResolver();
         $this->http     = new HttpClient(proxy: $proxy, debug: $debug, logger: $logger);
-        $this->pageResolver = new DynamicPageResolver(logger: $this->logger, debug: $this->debug);
     }
 
     /**
@@ -197,89 +193,7 @@ final class ValidGameClient
     {
         return $this->check('valorant', $uid);
     }
-    /**
-     * NEW: Check by path slug from the public store page, e.g. "dazz-live".
-     * Only needs (slug, uid, [server?]), auto-discovers tokens/ids by scraping the page.
-     *
-     * @param string $pathSlug      e.g. "dazz-live"
-     * @param string|int $uid
-     * @param string|int|null $server
-     * @param int|null $pricePointId optional override
-     * @param float|int|null $price  optional override
-     */
-    public function checkByPath(
-        string $pathSlug,
-        string|int|null $uid,
-        string|int|null $server = null,
-        ?int $pricePointId = null,
-        float|int|null $price = null
-    ): GameResult {
-        $canonical = Str::canonicalGame($pathSlug);
 
-        if ($uid === null || $uid === '') {
-            return GameResult::make(false, 'INVALID_INPUT', 'User ID is required.', $canonical, $uid, $server);
-        }
-
-        // Build payload by scraping the page
-        try {
-            $payload = $this->pageResolver->resolveFromPath($pathSlug, $uid, $server, $pricePointId, $price);
-        } catch (\Throwable $e) {
-            $msg = $e->getMessage();
-            $code = \str_starts_with($msg, 'SCRAPE_FIELD_MISSING') ? 'SCRAPE_FIELD_MISSING'
-                : (\str_starts_with($msg, 'SCRAPE_HTTP_ERROR') ? 'SCRAPE_HTTP_ERROR' : 'SCRAPE_FAILED');
-            return GameResult::make(false, $code, $msg, $canonical, $uid, $server, httpStatus: null, meta: $this->debug ? ['exception' => $msg] : null);
-        }
-
-        // Send init request
-        try {
-            $resp = $this->http->postInit($payload);
-        } catch (HttpRequestException $e) {
-            return GameResult::make(false, 'HTTP_ERROR', $e->getMessage(), $canonical, $uid, $server);
-        } catch (\Throwable $e) {
-            return GameResult::make(false, 'EXCEPTION', $e->getMessage(), $canonical, $uid, $server);
-        }
-
-        $status = $resp['status'] ?? 0;
-        $body   = $resp['body'] ?? '';
-        $data   = \is_string($body) && $body !== '' ? \json_decode($body, true) : null;
-
-        if ($data === null) {
-            return GameResult::make(false, 'NON_JSON', 'Received non-JSON or empty response.', $canonical, $uid, $server, httpStatus: $status, meta: $this->debug ? ['raw' => \mb_substr($body, 0, 1500)] : null);
-        }
-
-        if (($status >= 200 && $status < 300) && isset($data['errorCode']) && $data['errorCode'] === '') {
-            // Try extract nickname and/or server if present; reuse same extractor from old method.
-            [$nickname, $serverExtracted] = [null, null];
-            // Most dynamic pages expose username at confirmationFields.username
-            if (isset($data['confirmationFields']['username']) && \is_string($data['confirmationFields']['username'])) {
-                $nickname = $data['confirmationFields']['username'];
-            } elseif (isset($data['confirmationFields']['roles'][0]['role'])) {
-                $nickname = (string)$data['confirmationFields']['roles'][0]['role'];
-            }
-            if (isset($data['confirmationFields']['roles'][0]['server'])) {
-                $serverExtracted = $data['confirmationFields']['roles'][0]['server'];
-            }
-
-            return GameResult::make(
-                true,
-                'OK',
-                'Success requesting to API.',
-                $canonical,
-                $uid,
-                $serverExtracted ?? $server,
-                $nickname,
-                httpStatus: $status,
-                meta: $this->debug ? ['data' => $data] : null
-            );
-        }
-
-        if (isset($data['errorCode']) && $data['errorCode'] !== '') {
-            $msg = $data['errorMsg'] ?? 'API returned an error.';
-            return GameResult::make(false, 'API_ERROR', $msg, $canonical, $uid, $server, httpStatus: $status, meta: $this->debug ? ['data' => $data] : null);
-        }
-
-        return GameResult::make(false, 'UNEXPECTED_FORMAT', 'Unexpected response or HTTP error: ' . $status, $canonical, $uid, $server, httpStatus: $status, meta: $this->debug ? ['data' => $data] : null);
-    }
     /**
      * Extract nickname (and sometimes server) based on registry hints.
      * @param array<string,mixed> $data

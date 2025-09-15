@@ -62,7 +62,7 @@ final class Validator
         // If productPath is supplied, convert to absoluteUrl
         if (!isset($options['absoluteUrl']) && isset($options['productPath']) && is_string($options['productPath'])) {
             $path = ltrim($options['productPath'], '/');
-            $options['absoluteUrl'] = "https://www.codashop.com/{$path}";
+            $options['absoluteUrl'] = "https://www.codashop.com/id-id/{$path}";
         }
 
         return (new self())->checkInternal(new CheckRequest(

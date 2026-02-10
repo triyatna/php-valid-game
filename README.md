@@ -310,16 +310,12 @@ Every call returns a `ValidationResult`:
 ```json
 {
   "status": true,
-  "code": "OK",
   "message": "User ID is valid.",
-  "game": "freefire",
-  "userId": "123456789",
-  "zoneId": null,
-  "nickname": "PlayerName",
-  "provider": "codashop",
-  "httpStatus": 200,
-  "timestamp": "2025-09-16T12:34:56+00:00",
-  "meta": null
+  "data": {
+    "game": "Free Fire",
+    "nickname": "PlayerName",
+    "country": ""
+  }
 }
 ```
 

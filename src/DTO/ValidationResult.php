@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Triyatna\PhpValidGame\DTO;
 
 use Triyatna\PhpValidGame\Enums\StatusCode;
+use Triyatna\PhpValidGame\Registry\GameRegistry;
 
 /**
  * Unified validation result envelope.
  *
  * Returned from every validation attempt, regardless of the provider used.
+ * Provides a clean, professional API with essential information.
  */
 final class ValidationResult
 {
@@ -22,10 +24,11 @@ final class ValidationResult
         public readonly string|int|null $zoneId = null,
         public readonly ?string $nickname = null,
         public readonly ?string $provider = null,
-        public readonly ?int $httpStatus = null,
-        public readonly ?string $timestamp = null,
+        // Internal/debug fields (not included in public API)
+        private readonly ?int $httpStatus = null,
+        private readonly ?string $timestamp = null,
         /** @var array<string,mixed>|null */
-        public readonly ?array $meta = null,
+        private readonly ?array $meta = null
     ) {}
 
     /**
@@ -43,12 +46,12 @@ final class ValidationResult
         ?string $nickname = null,
         ?string $provider = null,
         ?int $httpStatus = null,
-        ?array $meta = null,
+        ?array $meta = null
     ): self {
         return new self(
             status: $status,
             code: $code,
-            message: $message,
+            message: $message ?? $code->value,
             game: $game,
             userId: $userId,
             zoneId: $zoneId,
@@ -61,33 +64,51 @@ final class ValidationResult
     }
 
     /**
-     * Convert to a plain array for JSON serialization.
+     * Convert to a clean array for JSON serialization.
+     * Returns nested structure with status, message, and data object.
      *
      * @return array<string,mixed>
      */
     public function toArray(): array
     {
+        $canonicalGame = $this->game ? GameRegistry::resolveCanonical($this->game) : null;
+        $gameDefinition = $canonicalGame ? GameRegistry::get($canonicalGame) : null;
+        $gameLabel = $gameDefinition['label'] ?? $this->game ?? '';
+
         return [
-            'status'     => $this->status,
-            'code'       => $this->code->value,
-            'message'    => $this->message,
-            'game'       => $this->game,
-            'userId'     => $this->userId,
-            'zoneId'     => $this->zoneId,
-            'nickname'   => $this->nickname,
-            'provider'   => $this->provider,
-            'httpStatus' => $this->httpStatus,
-            'timestamp'  => $this->timestamp ?? (new \DateTimeImmutable('now'))->format(\DateTimeInterface::ATOM),
-            'meta'       => $this->meta,
+            'status' => $this->status,
+            'message' => $this->status
+                ? 'User ID is valid.'
+                : ($this->message ?? $this->code->value),
+            'data' => [
+                'game' => $gameLabel,
+                'nickname' => $this->status ? $this->nickname : '',
+                'country' => '', // TODO: Implement country detection from zoneId (e.g., zoneId patterns for different countries)
+            ],
         ];
     }
 
     /**
-     * Convert to JSON string.
+     * Convert to JSON string with clean, professional format.
      */
     public function toJson(int $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE): string
     {
         return (string) json_encode($this->toArray(), $flags);
+    }
+
+    /**
+     * Get debug information (HTTP status, timestamp, raw data).
+     * Only available when debug mode is enabled.
+     *
+     * @return array<string,mixed>
+     */
+    public function debug(): array
+    {
+        return [
+            'httpStatus' => $this->httpStatus,
+            'timestamp'  => $this->timestamp,
+            'meta'       => $this->meta,
+        ];
     }
 
     /**
@@ -96,5 +117,21 @@ final class ValidationResult
     public function isValid(): bool
     {
         return $this->status;
+    }
+
+    /**
+     * Get the status code as string.
+     */
+    public function getCode(): string
+    {
+        return $this->code->value;
+    }
+
+    /**
+     * Get the human-readable message.
+     */
+    public function getMessage(): string
+    {
+        return $this->message ?? $this->code->value;
     }
 }

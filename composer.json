@@ -1,6 +1,6 @@
 {
   "name": "triyatna/php-valid-game",
-  "description": "PHP package for validating game user IDs via Codashop scraping and GoPay Games API",
+  "description": "PHP package for validating game user IDs via Codashop scraping and GoPay Games",
   "keywords": [
     "game",
     "validation",
@@ -15,7 +15,7 @@
   "authors": [
     {
       "name": "Tri Yatna",
-      "email": "triyatna@gmail.com"
+      "email": "triyatna.dev@gmail.com"
     }
   ],
   "require": {
